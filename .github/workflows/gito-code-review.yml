@@ -23,6 +23,17 @@ jobs:
         #   2. Reviewing PRs for secret exfiltration and other malicious code before approving workflow runs.
         ref: ${{ github.event.pull_request.head.sha }}
 
+    - name: Check for LLM key
+      id: check
+      env:
+        LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+      run: |
+        if [ -z "$LLM_API_KEY" ]; then
+          echo "has_key=false" >> "$GITHUB_OUTPUT"
+          echo "::warning title=Code review skipped::LLM_API_KEY not set; skipping AI code review."
+        else
+          echo "has_key=true" >> "$GITHUB_OUTPUT"
+        fi
     - name: Set up Python
       uses: actions/setup-python@v6
       with: { python-version: "3.13" }
@@ -34,6 +45,7 @@ jobs:
         echo "$(poetry env info --path)/bin" >> $GITHUB_PATH
 
     - name: Run AI code review
+      if: steps.check.outputs.has_key == 'true'
       env:
         # OpenAI Setup:
         # LLM_API_TYPE: openai
@@ -56,6 +68,7 @@ jobs:
         gito github-comment
 
     - uses: actions/upload-artifact@v6
+      if: steps.check.outputs.has_key == 'true'
       with:
         name: gito-code-review-results
         path: |
